@@ -1,0 +1,21 @@
+name = "cf-ai-gateway"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+account_id = "b0341dda0989012bead222d60a80b046"
+
+# 绑定自定义域名
+workers_dev = true
+routes = [
+  { pattern = "ai.redmi.kdns.fr", custom_domain = true }
+]
+
+[[kv_namespaces]]
+binding = "AI_GATEWAY_KV"
+id = "07a4162d5b774f599eb483f7611c64b6"
+
+[ai]
+binding = "AI"
+
+[vars]
+# 管理员初始登录密码（首次登录可通过控制台界面更改）
+ADMIN_PASSWORD = "admin"

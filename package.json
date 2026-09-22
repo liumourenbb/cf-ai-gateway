@@ -1,0 +1,14 @@
+{
+  "name": "cf-ai-gateway",
+  "version": "1.0.0",
+  "description": "Serverless AI API Key Management Console & Gateway for Claude Code, OpenAI CLI and ZCode",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^4.136.2"
+  }
+}
