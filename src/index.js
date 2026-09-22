@@ -127,22 +127,40 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
             </table>
           </div>
 
-          <div class="card p-3">
-            <h6 class="fw-bold mb-2"><i class="bi bi-cpu"></i> 默认 Cloudflare Workers AI 模型映射</h6>
-            <div class="row g-2 align-items-center">
-              <div class="col-md-5">
-                <label class="form-label small text-muted">Claude Code 映射的 CF 边缘模型：</label>
-                <input type="text" id="cf-claude-model" class="form-control form-control-sm" value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">
+          <div class="card p-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-cpu text-primary"></i> 默认 Cloudflare Workers AI 边缘模型映射配置</h6>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">Claude Code 映射的 CF 边缘模型：</label>
+                <div class="input-group">
+                  <input type="text" id="cf-claude-model" class="form-control" list="model-presets">
+                  <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">预设选择</button>
+                  <ul class="dropdown-menu dropdown-menu-end" id="claude-presets-dropdown"></ul>
+                </div>
+                <div class="form-text">Claude Code 发起的请求若未特别指定模型，将默认由此模型处理。</div>
               </div>
-              <div class="col-md-5">
-                <label class="form-label small text-muted">OpenAI / ZCode 映射的 CF 边缘模型：</label>
-                <input type="text" id="cf-openai-model" class="form-control form-control-sm" value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">
-              </div>
-              <div class="col-md-2 mt-4">
-                <button class="btn btn-sm btn-outline-primary w-100" onclick="saveModelMapping()">保存映射</button>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">OpenAI / ZCode 映射的 CF 边缘模型：</label>
+                <div class="input-group">
+                  <input type="text" id="cf-openai-model" class="form-control" list="model-presets">
+                  <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">预设选择</button>
+                  <ul class="dropdown-menu dropdown-menu-end" id="openai-presets-dropdown"></ul>
+                </div>
+                <div class="form-text">OpenAI CLI / ZCode 请求若使用通用名称时，映射到的边缘模型。</div>
               </div>
             </div>
-            <small class="text-muted mt-2">支持模型：<code>@cf/meta/llama-3.3-70b-instruct</code>, <code>@cf/meta/llama-3.1-8b-instruct</code>, <code>@cf/deepseek-ai/deepseek-r1-distill-qwen-32b</code>, <code>@cf/qwen/qwen1.5-14b-chat-awq</code> 等。</small>
+            <datalist id="model-presets"></datalist>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="text-muted small">支持在客户端直接通过 <code>model</code> 参数动态调用列表内的任一模型。</span>
+              <button class="btn btn-primary btn-sm px-4" onclick="saveModelMapping()"><i class="bi bi-check-lg"></i> 保存并立即生效</button>
+            </div>
+
+            <!-- 可用模型一览表 -->
+            <div class="mt-4">
+              <h6 class="fw-bold small text-secondary mb-2"><i class="bi bi-grid-3x3-gap"></i> Cloudflare 官方热门边缘模型快速点击切换：</h6>
+              <div class="d-flex flex-wrap gap-2" id="quick-models-container"></div>
+            </div>
           </div>
         </div>
 
@@ -416,7 +434,57 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       loadChannels();
     }
 
+    const CF_CATALOG = [
+      { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B (Fast)', tag: '推荐默认' },
+      { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', name: 'DeepSeek R1 32B (推理)', tag: '推理' },
+      { id: '@cf/deepseek-ai/deepseek-v4-pro-0813', name: 'DeepSeek V4 Pro (1M上下文)', tag: '最新' },
+      { id: '@cf/deepseek-ai/deepseek-v4-flash-0731', name: 'DeepSeek V4 Flash', tag: '极速' },
+      { id: '@cf/qwen/qwen2.5-coder-32b-instruct', name: 'Qwen 2.5 Coder 32B (代码)', tag: '编程' },
+      { id: '@cf/qwen/qwq-32b', name: '通义千问 QwQ 32B (推理)', tag: '中文' },
+      { id: '@cf/qwen/qwen3-30b-a3b-fp8', name: 'Qwen 3 30B FP8', tag: '新一代' },
+      { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B (OpenAI)', tag: '超大参数' },
+      { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B (MoE)', tag: '架构创新' },
+      { id: '@cf/moonshotai/kimi-k2.7-code', name: 'Kimi K2.7 Code (262k)', tag: '长上下文' },
+      { id: '@cf/zai-org/glm-5.3', name: 'GLM-5.3 (1M)', tag: '智谱旗舰' },
+      { id: '@cf/meta/llama-3.1-8b-instruct-fp8', name: 'Llama 3.1 8B (轻量)', tag: '秒回' }
+    ];
+
+    function initModelCatalogUI() {
+      const datalist = document.getElementById('model-presets');
+      const claudeDropdown = document.getElementById('claude-presets-dropdown');
+      const openaiDropdown = document.getElementById('openai-presets-dropdown');
+      const quickContainer = document.getElementById('quick-models-container');
+
+      datalist.innerHTML = CF_CATALOG.map(m => \`<option value="\${m.id}">\${m.name}</option>\`).join('');
+
+      claudeDropdown.innerHTML = CF_CATALOG.map(m => \`
+        <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectModel('claude', '\${m.id}')">\${m.name} <small class="text-muted">(\${m.tag})</small></a></li>
+      \`).join('');
+
+      openaiDropdown.innerHTML = CF_CATALOG.map(m => \`
+        <li><a class="dropdown-item" href="javascript:void(0)" onclick="selectModel('openai', '\${m.id}')">\${m.name} <small class="text-muted">(\${m.tag})</small></a></li>
+      \`).join('');
+
+      quickContainer.innerHTML = CF_CATALOG.map(m => \`
+        <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" onclick="applyBothModels('\${m.id}')">
+          <span>\${m.name}</span>
+          <span class="badge bg-light text-dark border">\${m.tag}</span>
+        </button>
+      \`).join('');
+    }
+
+    function selectModel(target, id) {
+      if (target === 'claude') document.getElementById('cf-claude-model').value = id;
+      if (target === 'openai') document.getElementById('cf-openai-model').value = id;
+    }
+
+    function applyBothModels(id) {
+      document.getElementById('cf-claude-model').value = id;
+      document.getElementById('cf-openai-model').value = id;
+    }
+
     async function loadSettings() {
+      initModelCatalogUI();
       const mapping = await req('/settings/mapping');
       if (mapping.claudeModel) document.getElementById('cf-claude-model').value = mapping.claudeModel;
       if (mapping.openaiModel) document.getElementById('cf-openai-model').value = mapping.openaiModel;
@@ -480,15 +548,25 @@ export default {
         return await handleAdminApi(request, env, url);
       }
 
-      // 4. 获取模型列表 /v1/models (适配 OpenAI CLI / 常见工具探活)
+      // 4. 获取模型列表 /v1/models (适配 OpenAI CLI / 常见工具探活与模型自动发现)
       if (url.pathname === "/v1/models" || url.pathname === "/models") {
         return jsonResp({
           object: "list",
           data: [
-            { id: "@cf/meta/llama-3.3-70b-instruct", object: "model", owned_by: "cloudflare" },
-            { id: "@cf/meta/llama-3.1-8b-instruct", object: "model", owned_by: "cloudflare" },
-            { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", object: "model", owned_by: "cloudflare" },
-            { id: "@cf/qwen/qwen1.5-14b-chat-awq", object: "model", owned_by: "cloudflare" },
+            { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", object: "model", owned_by: "cloudflare", description: "Llama 3.3 70B (Fast FP8)" },
+            { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", object: "model", owned_by: "cloudflare", description: "DeepSeek R1 Distill Qwen 32B (Reasoning)" },
+            { id: "@cf/deepseek-ai/deepseek-v4-pro-0813", object: "model", owned_by: "cloudflare", description: "DeepSeek V4 Pro (1M context reasoning)" },
+            { id: "@cf/deepseek-ai/deepseek-v4-flash-0731", object: "model", owned_by: "cloudflare", description: "DeepSeek V4 Flash" },
+            { id: "@cf/qwen/qwen2.5-coder-32b-instruct", object: "model", owned_by: "cloudflare", description: "Qwen 2.5 Coder 32B" },
+            { id: "@cf/qwen/qwq-32b", object: "model", owned_by: "cloudflare", description: "Qwen QwQ 32B (Reasoning)" },
+            { id: "@cf/qwen/qwen3-30b-a3b-fp8", object: "model", owned_by: "cloudflare", description: "Qwen 3 30B FP8" },
+            { id: "@cf/openai/gpt-oss-120b", object: "model", owned_by: "cloudflare", description: "GPT-OSS 120B (OpenAI Open Weight)" },
+            { id: "@cf/meta/llama-4-scout-17b-16e-instruct", object: "model", owned_by: "cloudflare", description: "Llama 4 Scout 17B (MoE)" },
+            { id: "@cf/meta/llama-3.1-8b-instruct-fp8", object: "model", owned_by: "cloudflare", description: "Llama 3.1 8B (Fast)" },
+            { id: "@cf/meta/llama-3.2-3b-instruct", object: "model", owned_by: "cloudflare", description: "Llama 3.2 3B" },
+            { id: "@cf/moonshotai/kimi-k2.7-code", object: "model", owned_by: "cloudflare", description: "Kimi K2.7 Code (262k context)" },
+            { id: "@cf/zai-org/glm-5.3", object: "model", owned_by: "cloudflare", description: "GLM-5.3 (1M context)" },
+            { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", object: "model", owned_by: "cloudflare", description: "Mistral Small 3.1 24B" },
             { id: "claude-3-7-sonnet-20250219", object: "model", owned_by: "anthropic" },
             { id: "gpt-4o", object: "model", owned_by: "openai" }
           ]
@@ -701,7 +779,12 @@ async function runCloudflareEdgeAI(request, env, isClaude) {
     messages = body.messages || [{ role: "user", content: body.prompt || "Hello" }];
   }
 
-  const chosenModel = (isClaude ? mapping.claudeModel : mapping.openaiModel) || "@cf/meta/llama-3.3-70b-instruct";
+  // 允许客户端请求直接指定 Cloudflare 模型（以 @cf/ 开头），否则使用控制台映射模型
+  let chosenModel = body.model;
+  if (!chosenModel || !chosenModel.startsWith("@cf/")) {
+    chosenModel = isClaude ? mapping.claudeModel : mapping.openaiModel;
+  }
+  if (!chosenModel) chosenModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
   try {
     if (isStream) {
