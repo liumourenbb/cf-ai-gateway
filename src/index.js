@@ -69,7 +69,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
           <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-keys" type="button"><i class="bi bi-key-fill"></i> 分发令牌 (API Keys)</button>
         </li>
         <li class="nav-item">
-          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-channels" type="button"><i class="bi bi-hdd-network-fill"></i> 渠道与模型设置</button>
+          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-channels" type="button"><i class="bi bi-hdd-network-fill"></i> 渠道与模型映射</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-models" type="button" onclick="loadModelsCatalog()"><i class="bi bi-robot"></i> 可用模型库</button>
         </li>
         <li class="nav-item">
           <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-guide" type="button"><i class="bi bi-terminal-fill"></i> CLI 接入指引</button>
@@ -161,6 +164,36 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
               <h6 class="fw-bold small text-secondary mb-2"><i class="bi bi-grid-3x3-gap"></i> Cloudflare 官方热门边缘模型快速点击切换：</h6>
               <div class="d-flex flex-wrap gap-2" id="quick-models-container"></div>
             </div>
+        </div>
+
+        <!-- 可用模型库详情面板 -->
+        <div class="tab-pane fade" id="tab-models">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div>
+              <h5 class="mb-1"><i class="bi bi-robot text-primary"></i> 可用边缘大模型列表</h5>
+              <div class="text-muted small">所有列出的模型均支持直接调用，复制模型 ID 即可在 CLI 或代码中使用。</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <input type="text" id="model-search" class="form-control form-control-sm" placeholder="搜索模型名称或厂商..." oninput="filterModelsTable()">
+              <button class="btn btn-outline-secondary btn-sm text-nowrap" onclick="loadModelsCatalog()"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+            </div>
+          </div>
+
+          <div class="card p-0 overflow-hidden mb-4">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>模型名称</th>
+                  <th>官方模型 ID (复制即可用)</th>
+                  <th>提供方 / 架构</th>
+                  <th>核心亮点 / 特点</th>
+                  <th>快速测试</th>
+                </tr>
+              </thead>
+              <tbody id="models-table-body">
+                <tr><td colspan="5" class="text-center py-4 text-muted">加载中...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -481,6 +514,86 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
     function applyBothModels(id) {
       document.getElementById('cf-claude-model').value = id;
       document.getElementById('cf-openai-model').value = id;
+    }
+
+    let cachedModels = [];
+
+    async function loadModelsCatalog() {
+      const tbody = document.getElementById('models-table-body');
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>加载可用模型列表中...</td></tr>';
+      try {
+        const res = await fetch('/v1/models');
+        const data = await res.json();
+        cachedModels = data.data || [];
+        renderModelsTable(cachedModels);
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-danger">加载失败: ' + e.message + '</td></tr>';
+      }
+    }
+
+    function renderModelsTable(list) {
+      const tbody = document.getElementById('models-table-body');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">未找到匹配的模型</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(m => {
+        const isCf = m.id.startsWith('@cf/');
+        const ownerBadge = isCf 
+          ? '<span class="badge bg-success">Cloudflare Workers AI</span>' 
+          : '<span class="badge bg-secondary">' + (m.owned_by || 'External') + '</span>';
+        const modelName = m.id.split('/').pop();
+        return \`
+          <tr>
+            <td><strong>\${modelName}</strong></td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <code>\${m.id}</code>
+                <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="复制模型ID" onclick="copyText('\${m.id}')">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </td>
+            <td>\${ownerBadge}</td>
+            <td>\${m.description || '通用大语言模型'}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" onclick="setAsDefault('\${m.id}')">
+                设为默认
+              </button>
+            </td>
+          </tr>
+        \`;
+      }).join('');
+    }
+
+    function filterModelsTable() {
+      const query = (document.getElementById('model-search').value || '').toLowerCase().trim();
+      if (!query) {
+        renderModelsTable(cachedModels);
+        return;
+      }
+      const filtered = cachedModels.filter(m => 
+        m.id.toLowerCase().includes(query) || 
+        (m.description && m.description.toLowerCase().includes(query)) ||
+        (m.owned_by && m.owned_by.toLowerCase().includes(query))
+      );
+      renderModelsTable(filtered);
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('已复制模型 ID: ' + text);
+      }).catch(() => {
+        prompt('请复制模型 ID:', text);
+      });
+    }
+
+    function setAsDefault(id) {
+      applyBothModels(id);
+      saveModelMapping();
+      // 切换到渠道与模型设置 Tab
+      const triggerEl = document.querySelector('button[data-bs-target="#tab-channels"]');
+      bootstrap.Tab.getInstance(triggerEl) || new bootstrap.Tab(triggerEl).show();
     }
 
     async function loadSettings() {
