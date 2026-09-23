@@ -468,18 +468,13 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
     }
 
     const CF_CATALOG = [
-      { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B (Fast)', tag: '推荐默认' },
-      { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', name: 'DeepSeek R1 32B (推理)', tag: '推理' },
-      { id: '@cf/deepseek-ai/deepseek-v4-pro-0813', name: 'DeepSeek V4 Pro (1M上下文)', tag: '最新' },
-      { id: '@cf/deepseek-ai/deepseek-v4-flash-0731', name: 'DeepSeek V4 Flash', tag: '极速' },
-      { id: '@cf/qwen/qwen2.5-coder-32b-instruct', name: 'Qwen 2.5 Coder 32B (代码)', tag: '编程' },
-      { id: '@cf/qwen/qwq-32b', name: '通义千问 QwQ 32B (推理)', tag: '中文' },
-      { id: '@cf/qwen/qwen3-30b-a3b-fp8', name: 'Qwen 3 30B FP8', tag: '新一代' },
-      { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B (OpenAI)', tag: '超大参数' },
-      { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B (MoE)', tag: '架构创新' },
-      { id: '@cf/moonshotai/kimi-k2.7-code', name: 'Kimi K2.7 Code (262k)', tag: '长上下文' },
-      { id: '@cf/zai-org/glm-5.3', name: 'GLM-5.3 (1M)', tag: '智谱旗舰' },
-      { id: '@cf/meta/llama-3.1-8b-instruct-fp8', name: 'Llama 3.1 8B (轻量)', tag: '秒回' }
+      { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B (Fast)', tag: '免费旗舰' },
+      { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', name: 'DeepSeek R1 32B (推理)', tag: '免费推理' },
+      { id: '@cf/qwen/qwen2.5-coder-32b-instruct', name: 'Qwen 2.5 Coder 32B (编程)', tag: '免费代码' },
+      { id: '@cf/qwen/qwq-32b', name: '通义千问 QwQ 32B (推理)', tag: '免费中文' },
+      { id: '@cf/meta/llama-3.1-8b-instruct-fp8', name: 'Llama 3.1 8B (轻量)', tag: '免费极速' },
+      { id: '@cf/meta/llama-3.2-3b-instruct', name: 'Llama 3.2 3B', tag: '免费超轻' },
+      { id: '@cf/meta/llama-3.2-1b-instruct', name: 'Llama 3.2 1B', tag: '免费秒回' }
     ];
 
     function initModelCatalogUI() {
@@ -661,27 +656,18 @@ export default {
         return await handleAdminApi(request, env, url);
       }
 
-      // 4. 获取模型列表 /v1/models (适配 OpenAI CLI / 常见工具探活与模型自动发现)
+      // 4. 获取模型列表 /v1/models (仅返回 Cloudflare 免费可用模型，保证 zCode/客户端拉取时不报错)
       if (url.pathname === "/v1/models" || url.pathname === "/models") {
         return jsonResp({
           object: "list",
           data: [
-            { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", object: "model", owned_by: "cloudflare", description: "Llama 3.3 70B (Fast FP8)" },
-            { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", object: "model", owned_by: "cloudflare", description: "DeepSeek R1 Distill Qwen 32B (Reasoning)" },
-            { id: "@cf/deepseek-ai/deepseek-v4-pro-0813", object: "model", owned_by: "cloudflare", description: "DeepSeek V4 Pro (1M context reasoning)" },
-            { id: "@cf/deepseek-ai/deepseek-v4-flash-0731", object: "model", owned_by: "cloudflare", description: "DeepSeek V4 Flash" },
-            { id: "@cf/qwen/qwen2.5-coder-32b-instruct", object: "model", owned_by: "cloudflare", description: "Qwen 2.5 Coder 32B" },
-            { id: "@cf/qwen/qwq-32b", object: "model", owned_by: "cloudflare", description: "Qwen QwQ 32B (Reasoning)" },
-            { id: "@cf/qwen/qwen3-30b-a3b-fp8", object: "model", owned_by: "cloudflare", description: "Qwen 3 30B FP8" },
-            { id: "@cf/openai/gpt-oss-120b", object: "model", owned_by: "cloudflare", description: "GPT-OSS 120B (OpenAI Open Weight)" },
-            { id: "@cf/meta/llama-4-scout-17b-16e-instruct", object: "model", owned_by: "cloudflare", description: "Llama 4 Scout 17B (MoE)" },
-            { id: "@cf/meta/llama-3.1-8b-instruct-fp8", object: "model", owned_by: "cloudflare", description: "Llama 3.1 8B (Fast)" },
-            { id: "@cf/meta/llama-3.2-3b-instruct", object: "model", owned_by: "cloudflare", description: "Llama 3.2 3B" },
-            { id: "@cf/moonshotai/kimi-k2.7-code", object: "model", owned_by: "cloudflare", description: "Kimi K2.7 Code (262k context)" },
-            { id: "@cf/zai-org/glm-5.3", object: "model", owned_by: "cloudflare", description: "GLM-5.3 (1M context)" },
-            { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", object: "model", owned_by: "cloudflare", description: "Mistral Small 3.1 24B" },
-            { id: "claude-3-7-sonnet-20250219", object: "model", owned_by: "anthropic" },
-            { id: "gpt-4o", object: "model", owned_by: "openai" }
+            { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", object: "model", owned_by: "cloudflare", description: "Llama 3.3 70B Fast (免费旗舰推荐)" },
+            { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", object: "model", owned_by: "cloudflare", description: "DeepSeek R1 32B (免费推理大模型)" },
+            { id: "@cf/qwen/qwen2.5-coder-32b-instruct", object: "model", owned_by: "cloudflare", description: "Qwen 2.5 Coder 32B (免费代码编程)" },
+            { id: "@cf/qwen/qwq-32b", object: "model", owned_by: "cloudflare", description: "通义千问 QwQ 32B (免费中文推理)" },
+            { id: "@cf/meta/llama-3.1-8b-instruct-fp8", object: "model", owned_by: "cloudflare", description: "Llama 3.1 8B (免费秒回轻量)" },
+            { id: "@cf/meta/llama-3.2-3b-instruct", object: "model", owned_by: "cloudflare", description: "Llama 3.2 3B (免费超轻量)" },
+            { id: "@cf/meta/llama-3.2-1b-instruct", object: "model", owned_by: "cloudflare", description: "Llama 3.2 1B (免费极简)" }
           ]
         });
       }
