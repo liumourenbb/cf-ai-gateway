@@ -887,13 +887,113 @@ async function runCloudflareEdgeAI(request, env, isClaude) {
 
   try {
     if (isStream) {
-      // 流式响应处理
+      // 流式响应处理：必须将 Cloudflare Workers AI 的原始流转译为标准 OpenAI / Anthropic SSE 格式
       const aiStream = await env.AI.run(chosenModel, {
         messages: messages,
         stream: true,
       });
 
-      return new Response(aiStream, {
+      const chatId = "chatcmpl-" + crypto.randomUUID().replace(/-/g, "");
+      const msgId = "msg_" + crypto.randomUUID().replace(/-/g, "");
+      const created = Math.floor(Date.now() / 1000);
+
+      const textDecoder = new TextDecoder();
+      const textEncoder = new TextEncoder();
+
+      let buffer = "";
+
+      const transformStream = new TransformStream({
+        start(controller) {
+          if (isClaude) {
+            // Anthropic SSE 消息开始事件
+            const startPayload = JSON.stringify({
+              type: "message_start",
+              message: { id: msgId, type: "message", role: "assistant", content: [], model: chosenModel, usage: { input_tokens: 10, output_tokens: 1 } }
+            });
+            const blockPayload = JSON.stringify({
+              type: "content_block_start",
+              index: 0,
+              content_block: { type: "text", text: "" }
+            });
+            controller.enqueue(textEncoder.encode("event: message_start\ndata: " + startPayload + "\n\n"));
+            controller.enqueue(textEncoder.encode("event: content_block_start\ndata: " + blockPayload + "\n\n"));
+          }
+        },
+        transform(chunk, controller) {
+          buffer += textDecoder.decode(chunk, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop(); // 保留未完成的一行
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.replace(/^data:\s*/, "");
+            if (dataStr === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              const textContent = parsed.response || "";
+
+              if (isClaude) {
+                // Anthropic SSE 格式
+                const deltaPayload = JSON.stringify({
+                  type: "content_block_delta",
+                  index: 0,
+                  delta: { type: "text_delta", text: textContent }
+                });
+                controller.enqueue(textEncoder.encode("event: content_block_delta\ndata: " + deltaPayload + "\n\n"));
+              } else {
+                // 标准 OpenAI SSE 格式 (zCode 严格校验的 choices 数组格式)
+                const chunkPayload = JSON.stringify({
+                  id: chatId,
+                  object: "chat.completion.chunk",
+                  created: created,
+                  model: chosenModel,
+                  choices: [
+                    {
+                      index: 0,
+                      delta: { content: textContent },
+                      finish_reason: null
+                    }
+                  ]
+                });
+                controller.enqueue(textEncoder.encode("data: " + chunkPayload + "\n\n"));
+              }
+            } catch (err) {
+              // 忽略解析失败的非 JSON 帧
+            }
+          }
+        },
+        flush(controller) {
+          if (isClaude) {
+            // Anthropic 结束帧
+            const stopBlock = JSON.stringify({ type: "content_block_stop", index: 0 });
+            const deltaMsg = JSON.stringify({ type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 20 } });
+            const stopMsg = JSON.stringify({ type: "message_stop" });
+            controller.enqueue(textEncoder.encode("event: content_block_stop\ndata: " + stopBlock + "\n\n"));
+            controller.enqueue(textEncoder.encode("event: message_delta\ndata: " + deltaMsg + "\n\n"));
+            controller.enqueue(textEncoder.encode("event: message_stop\ndata: " + stopMsg + "\n\n"));
+          } else {
+            // OpenAI 结束帧
+            const endChunk = JSON.stringify({
+              id: chatId,
+              object: "chat.completion.chunk",
+              created: created,
+              model: chosenModel,
+              choices: [
+                {
+                  index: 0,
+                  delta: {},
+                  finish_reason: "stop"
+                }
+              ]
+            });
+            controller.enqueue(textEncoder.encode("data: " + endChunk + "\n\ndata: [DONE]\n\n"));
+          }
+        }
+      });
+
+      return new Response(aiStream.pipeThrough(transformStream), {
         headers: {
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache",
