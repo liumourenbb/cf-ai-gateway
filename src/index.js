@@ -18,11 +18,146 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .navbar { background: #0f172a; }
-    .card { border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .badge-protocol { font-size: 0.75rem; padding: 4px 8px; border-radius: 6px; }
-    .code-box { background: #1e293b; color: #f1f5f9; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; word-break: break-all; }
+    :root {
+      --bg-main: #0b0f19;
+      --card-bg: rgba(23, 32, 53, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(30, 41, 69, 0.85);
+      --primary-glow: #6366f1;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body {
+      background-color: var(--bg-main);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.1) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+    }
+    .navbar {
+      background: rgba(15, 23, 42, 0.85) !important;
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+    }
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
+      color: var(--text-main);
+    }
+    .table {
+      --bs-table-bg: transparent;
+      --bs-table-color: var(--text-main);
+      --bs-table-border-color: rgba(255, 255, 255, 0.07);
+    }
+    .table-light, thead.table-light th {
+      background: rgba(255, 255, 255, 0.03) !important;
+      color: var(--text-muted) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .table-hover tbody tr:hover td {
+      background: rgba(255, 255, 255, 0.03) !important;
+    }
+    .nav-pills .nav-link {
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .nav-pills .nav-link:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .nav-pills .nav-link.active {
+      color: #fff;
+      background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+      box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.4);
+    }
+    .form-control, .form-select {
+      background-color: rgba(15, 23, 42, 0.8) !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      color: #f1f5f9 !important;
+      border-radius: 8px;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: #6366f1 !important;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+    }
+    .form-control::placeholder {
+      color: #64748b !important;
+    }
+    .modal-content {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      color: #f8fafc;
+    }
+    .modal-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .modal-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .btn-close {
+      filter: invert(1);
+    }
+    .dropdown-menu {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .dropdown-item {
+      color: #cbd5e1;
+    }
+    .dropdown-item:hover {
+      background: rgba(99, 102, 241, 0.2);
+      color: #fff;
+    }
+    .code-box {
+      background: #090d16;
+      color: #38bdf8;
+      padding: 14px;
+      border-radius: 10px;
+      font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+      font-size: 0.85rem;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      word-break: break-all;
+    }
+    code {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .alert-info-glass {
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      border-radius: 12px;
+      color: #bae6fd;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
   </style>
 </head>
 <body>
@@ -32,8 +167,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         <i class="bi bi-cpu-fill text-warning"></i> Edge AI Gateway 控制台
       </span>
       <div id="nav-user" class="d-none text-light align-items-center gap-3">
-        <span class="badge bg-success">管理员在线</span>
-        <button class="btn btn-sm btn-outline-light" onclick="logout()">退出登录</button>
+        <span class="d-flex align-items-center gap-2 small bg-dark bg-opacity-50 px-3 py-1 rounded-pill border border-secondary border-opacity-25">
+          <span class="pulse-dot"></span> 管理员在线
+        </span>
+        <button class="btn btn-sm btn-outline-light border-opacity-25" onclick="logout()">退出登录</button>
       </div>
     </div>
   </nav>
@@ -43,12 +180,12 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     <div id="login-section" class="row justify-content-center py-5">
       <div class="col-md-5">
         <div class="card p-4">
-          <h4 class="card-title text-center mb-4">管理员登录</h4>
+          <h4 class="card-title text-center mb-4"><i class="bi bi-shield-lock text-primary me-2"></i>管理员登录</h4>
           <div class="mb-3">
-            <label class="form-label">管理员密码</label>
+            <label class="form-label text-muted small">管理员密码</label>
             <input type="password" id="admin-pwd" class="form-control" placeholder="默认密码: admin">
           </div>
-          <button class="btn btn-primary w-100" onclick="login()">登录</button>
+          <button class="btn btn-primary w-100 py-2" onclick="login()"><i class="bi bi-box-arrow-in-right me-1"></i> 立即登录</button>
           <div id="login-err" class="text-danger small mt-2 text-center d-none"></div>
         </div>
       </div>
@@ -56,11 +193,11 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
 
     <!-- 主控面板 -->
     <div id="main-section" class="d-none">
-      <div class="alert alert-info d-flex align-items-center mb-4">
-        <i class="bi bi-check-circle-fill fs-4 me-3 text-info"></i>
+      <div class="alert alert-info-glass d-flex align-items-center mb-4 p-3">
+        <i class="bi bi-cpu-fill fs-3 me-3 text-info"></i>
         <div>
-          <strong>Cloudflare Workers AI 边缘原生计算已接入！</strong> 
-          当前系统默认直接调用 CF 边缘计算核心模型（如 <code>@cf/meta/llama-3.3-70b-instruct</code>、<code>@cf/meta/llama-3.1-8b-instruct</code>），无需购买或配置第三方 API Key。
+          <div class="fw-bold">Cloudflare Workers AI 边缘原生计算加速中</div> 
+          <div class="small opacity-75">系统默认直接由 Cloudflare 边缘全球算力节点直出（含 <code>Llama 3.3 70B</code>、<code>DeepSeek R1 32B</code>、<code>Qwen 2.5 Coder</code>），免外接商业 API Key。</div>
         </div>
       </div>
 
@@ -333,8 +470,8 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
   <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header border-danger-subtle bg-danger-subtle">
-          <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> 高危确认：删除项</h5>
+        <div class="modal-header border-danger border-opacity-25" style="background: rgba(239, 68, 68, 0.1);">
+          <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i> 高危确认：删除项</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
