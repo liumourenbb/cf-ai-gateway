@@ -405,7 +405,7 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
               <div class="card p-4 h-100">
                 <h6 class="fw-bold mb-3"><i class="bi bi-key-fill text-primary me-2"></i>修改管理员密码</h6>
                 <div class="mb-3">
-                  <label class="form-label text-muted small">新密码</label>
+                  <label class="form-label small" style="color: #cbd5e1;">新密码</label>
                   <input type="password" id="new-admin-pwd" class="form-control" placeholder="输入新的管理员密码">
                 </div>
                 <button class="btn btn-outline-primary" onclick="changeAdminPwd()">更新密码</button>
@@ -418,18 +418,18 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <h6 class="fw-bold mb-0"><i class="bi bi-envelope-shield text-info me-2"></i>邮箱验证码登录设置</h6>
                   <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="email-auth-enabled" role="switch" onchange="toggleEmailAuthUI()">
+                    <input class="form-check-input" type="checkbox" id="email-auth-enabled" role="switch" onchange="toggleEmailAuthUI()" style="cursor: pointer; transform: scale(1.2);">
                   </div>
                 </div>
-                <p class="text-muted small">开启后，登录页将支持使用邮箱动态验证码进行验证登录；默认关闭，保持原有的传统密码管理登录。</p>
+                <p class="small mb-3" style="color: #94a3b8;">开启后，登录页将支持使用邮箱动态验证码进行验证登录；默认关闭，保持原有的传统密码管理登录。</p>
                 <div class="mb-3">
-                  <label class="form-label text-muted small">接收验证码的安全管理员邮箱</label>
+                  <label class="form-label small" style="color: #cbd5e1;">接收验证码的安全管理员邮箱</label>
                   <input type="email" id="email-auth-addr" class="form-control" value="cf@xvuvx.com" placeholder="例如 cf@xvuvx.com">
                 </div>
                 <div class="mb-3">
-                  <label class="form-label text-muted small">邮件发件服务 API Key (可选 Resend API Key，留空走内置邮件通道)</label>
+                  <label class="form-label small" style="color: #cbd5e1;">邮件发件服务 API Key (可选 Resend API Key，留空走内置邮件通道)</label>
                   <input type="password" id="email-resend-key" class="form-control" placeholder="re_xxxxxxxxxxxx">
-                  <div class="form-text small" style="color: #94a3b8;">若留空，系统将直接通过 Cloudflare 边缘环境投递或记录日志。</div>
+                  <div class="form-text small mt-1" style="color: #94a3b8;">若留空，系统将直接通过 Cloudflare 边缘环境投递或记录日志。</div>
                 </div>
                 <button class="btn btn-primary" onclick="saveEmailAuthConfig()"><i class="bi bi-floppy me-1"></i>保存邮箱登录设置</button>
               </div>
