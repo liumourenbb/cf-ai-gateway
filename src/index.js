@@ -181,12 +181,45 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       <div class="col-md-5">
         <div class="card p-4">
           <h4 class="card-title text-center mb-4"><i class="bi bi-shield-lock text-primary me-2"></i>管理员登录</h4>
-          <div class="mb-3">
-            <label class="form-label text-muted small">管理员密码</label>
-            <input type="password" id="admin-pwd" class="form-control" placeholder="默认密码: admin">
+          
+          <!-- 登录方式切换导航 (由系统设置开关决定是否显示邮箱验证) -->
+          <ul class="nav nav-pills nav-fill mb-3 d-none" id="login-method-nav">
+            <li class="nav-item">
+              <button class="nav-link active py-1" id="btn-login-pwd-tab" type="button" onclick="switchLoginMethod('pwd')"><i class="bi bi-key me-1"></i>密码登录</button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link py-1" id="btn-login-email-tab" type="button" onclick="switchLoginMethod('email')"><i class="bi bi-envelope-at me-1"></i>邮箱验证码</button>
+            </li>
+          </ul>
+
+          <!-- 方式 1: 密码登录 (原版，始终保留) -->
+          <div id="login-form-pwd">
+            <div class="mb-3">
+              <label class="form-label text-muted small">管理员密码</label>
+              <input type="password" id="admin-pwd" class="form-control" placeholder="默认密码: admin" onkeydown="if(event.key==='Enter') login()">
+            </div>
+            <button class="btn btn-primary w-100 py-2" onclick="login()"><i class="bi bi-box-arrow-in-right me-1"></i> 立即登录</button>
           </div>
-          <button class="btn btn-primary w-100 py-2" onclick="login()"><i class="bi bi-box-arrow-in-right me-1"></i> 立即登录</button>
+
+          <!-- 方式 2: 邮箱验证码登录 (通过配置开关控制开启) -->
+          <div id="login-form-email" class="d-none">
+            <div class="mb-3">
+              <label class="form-label text-muted small">管理员安全邮箱</label>
+              <input type="email" id="login-email" class="form-control" value="cf@xvuvx.com" placeholder="例如 cf@xvuvx.com">
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-muted small">动态验证码</label>
+              <div class="input-group">
+                <input type="text" id="login-email-code" class="form-control" placeholder="6 位验证码" maxlength="6" onkeydown="if(event.key==='Enter') loginByEmailCode()">
+                <button class="btn btn-outline-secondary" type="button" id="btn-send-code" onclick="sendLoginEmailCode()"><i class="bi bi-send me-1"></i>发送验证码</button>
+              </div>
+              <div class="form-text small opacity-75 mt-1">验证码将发送至绑定的 Cloudflare 目标邮箱。</div>
+            </div>
+            <button class="btn btn-primary w-100 py-2" onclick="loginByEmailCode()"><i class="bi bi-shield-check me-1"></i> 验证并登录</button>
+          </div>
+
           <div id="login-err" class="text-danger small mt-2 text-center d-none"></div>
+          <div id="login-succ" class="text-success small mt-2 text-center d-none"></div>
         </div>
       </div>
     </div>
@@ -366,13 +399,41 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
 
         <!-- 系统设置 -->
         <div class="tab-pane fade" id="tab-settings">
-          <div class="card p-4 col-md-6">
-            <h6 class="fw-bold mb-3">修改管理员密码</h6>
-            <div class="mb-3">
-              <label class="form-label">新密码</label>
-              <input type="password" id="new-admin-pwd" class="form-control">
+          <div class="row g-4">
+            <!-- 密码修改 -->
+            <div class="col-md-6">
+              <div class="card p-4 h-100">
+                <h6 class="fw-bold mb-3"><i class="bi bi-key-fill text-primary me-2"></i>修改管理员密码</h6>
+                <div class="mb-3">
+                  <label class="form-label text-muted small">新密码</label>
+                  <input type="password" id="new-admin-pwd" class="form-control" placeholder="输入新的管理员密码">
+                </div>
+                <button class="btn btn-outline-primary" onclick="changeAdminPwd()">更新密码</button>
+              </div>
             </div>
-            <button class="btn btn-outline-primary" onclick="changeAdminPwd()">更新密码</button>
+
+            <!-- 邮箱验证码登录开关 (配置中心) -->
+            <div class="col-md-6">
+              <div class="card p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0"><i class="bi bi-envelope-shield text-info me-2"></i>邮箱验证码登录设置</h6>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="email-auth-enabled" role="switch" onchange="toggleEmailAuthUI()">
+                  </div>
+                </div>
+                <p class="text-muted small">开启后，登录页将支持使用邮箱动态验证码进行验证登录；默认关闭，保持原有的传统密码管理登录。</p>
+                <div class="mb-3">
+                  <label class="form-label text-muted small">接收验证码的安全管理员邮箱</label>
+                  <input type="email" id="email-auth-addr" class="form-control" value="cf@xvuvx.com" placeholder="例如 cf@xvuvx.com">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label text-muted small">邮件发件服务 API Key (可选 Resend API Key，留空走内置邮件通道)</label>
+                  <input type="password" id="email-resend-key" class="form-control" placeholder="re_xxxxxxxxxxxx">
+                  <div class="form-text small" style="color: #94a3b8;">若留空，系统将直接通过 Cloudflare 边缘环境投递或记录日志。</div>
+                </div>
+                <button class="btn btn-primary" onclick="saveEmailAuthConfig()"><i class="bi bi-floppy me-1"></i>保存邮箱登录设置</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -511,6 +572,118 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       return await res.json();
     }
 
+    // 登录方式切换 (密码 vs 邮箱验证码)
+    function switchLoginMethod(method) {
+      const err = document.getElementById('login-err');
+      const succ = document.getElementById('login-succ');
+      if (err) err.classList.add('d-none');
+      if (succ) succ.classList.add('d-none');
+
+      if (method === 'pwd') {
+        document.getElementById('btn-login-pwd-tab').classList.add('active');
+        document.getElementById('btn-login-email-tab').classList.remove('active');
+        document.getElementById('login-form-pwd').classList.remove('d-none');
+        document.getElementById('login-form-email').classList.add('d-none');
+      } else {
+        document.getElementById('btn-login-email-tab').classList.add('active');
+        document.getElementById('btn-login-pwd-tab').classList.remove('active');
+        document.getElementById('login-form-email').classList.remove('d-none');
+        document.getElementById('login-form-pwd').classList.add('d-none');
+      }
+    }
+
+    // 发送邮箱动态验证码
+    let sendCodeCountdown = 0;
+    async function sendLoginEmailCode() {
+      const email = (document.getElementById('login-email').value || '').trim();
+      const err = document.getElementById('login-err');
+      const succ = document.getElementById('login-succ');
+      err.classList.add('d-none');
+      succ.classList.add('d-none');
+
+      if (!email) {
+        err.innerText = '请输入安全管理员邮箱';
+        err.classList.remove('d-none');
+        return;
+      }
+
+      const btn = document.getElementById('btn-send-code');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>发送中...';
+
+      try {
+        const res = await fetch('/admin/api/send-email-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (data.success) {
+          succ.innerText = data.message || '验证码已发送至邮箱，请查收！';
+          succ.classList.remove('d-none');
+          
+          // 倒计时 60 秒
+          sendCodeCountdown = 60;
+          const timer = setInterval(() => {
+            sendCodeCountdown--;
+            if (sendCodeCountdown <= 0) {
+              clearInterval(timer);
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-send me-1"></i>重新发送';
+            } else {
+              btn.innerHTML = sendCodeCountdown + 's 后重试';
+            }
+          }, 1000);
+        } else {
+          err.innerText = data.error || '验证码发送失败';
+          err.classList.remove('d-none');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-send me-1"></i>发送验证码';
+        }
+      } catch (e) {
+        err.innerText = '请求异常: ' + e.message;
+        err.classList.remove('d-none');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send me-1"></i>发送验证码';
+      }
+    }
+
+    // 邮箱验证码登录
+    async function loginByEmailCode() {
+      const email = (document.getElementById('login-email').value || '').trim();
+      const code = (document.getElementById('login-email-code').value || '').trim();
+      const err = document.getElementById('login-err');
+      const succ = document.getElementById('login-succ');
+      err.classList.add('d-none');
+      succ.classList.add('d-none');
+
+      if (!code) {
+        err.innerText = '请输入 6 位动态验证码';
+        err.classList.remove('d-none');
+        return;
+      }
+
+      try {
+        const res = await fetch('/admin/api/login-by-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code })
+        });
+        const data = await res.json();
+        if (data.token) {
+          token = data.token;
+          localStorage.setItem('admin_token', token);
+          showDashboard();
+        } else {
+          err.innerText = data.error || '验证码错误或已失效';
+          err.classList.remove('d-none');
+        }
+      } catch (e) {
+        err.innerText = '登录失败: ' + e.message;
+        err.classList.remove('d-none');
+      }
+    }
+
     async function login() {
       const pwd = document.getElementById('admin-pwd').value;
       const res = await fetch('/admin/api/login', {
@@ -537,6 +710,7 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       document.getElementById('main-section').classList.add('d-none');
       document.getElementById('nav-user').classList.remove('d-flex');
       document.getElementById('nav-user').classList.add('d-none');
+      checkLoginMethodAvailability();
     }
 
     function showDashboard() {
@@ -893,6 +1067,30 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       const mapping = await req('/settings/mapping');
       if (mapping.claudeModel) document.getElementById('cf-claude-model').value = mapping.claudeModel;
       if (mapping.openaiModel) document.getElementById('cf-openai-model').value = mapping.openaiModel;
+
+      // 读取邮箱验证登录配置
+      try {
+        const emailCfg = await req('/settings/email-auth');
+        document.getElementById('email-auth-enabled').checked = !!emailCfg.enabled;
+        if (emailCfg.email) document.getElementById('email-auth-addr').value = emailCfg.email;
+        if (emailCfg.resendKey) document.getElementById('email-resend-key').value = emailCfg.resendKey;
+      } catch (e) {}
+    }
+
+    function toggleEmailAuthUI() {
+      // 仅用于即时切换状态提醒
+    }
+
+    async function saveEmailAuthConfig() {
+      const enabled = document.getElementById('email-auth-enabled').checked;
+      const email = (document.getElementById('email-auth-addr').value || '').trim();
+      const resendKey = (document.getElementById('email-resend-key').value || '').trim();
+      await req('/settings/email-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, email, resendKey })
+      });
+      alert('邮箱验证登录配置已保存！' + (enabled ? '登录页已启用邮箱验证码登录入口。' : '登录页已恢复仅使用传统密码登录。'));
     }
 
     async function saveModelMapping() {
@@ -918,10 +1116,33 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       logout();
     }
 
+    // 检查服务端是否开启了邮箱验证码登录开关
+    async function checkLoginMethodAvailability() {
+      try {
+        const res = await fetch('/admin/api/public-config');
+        const cfg = await res.json();
+        const nav = document.getElementById('login-method-nav');
+        if (cfg && cfg.emailAuthEnabled) {
+          nav.classList.remove('d-none');
+          if (cfg.adminEmail) {
+            document.getElementById('login-email').value = cfg.adminEmail;
+          }
+        } else {
+          nav.classList.add('d-none');
+          switchLoginMethod('pwd');
+        }
+      } catch (e) {
+        document.getElementById('login-method-nav').classList.add('d-none');
+        switchLoginMethod('pwd');
+      }
+    }
+
     // 监听模型库 Tab 切换，自动拉取或刷新可用模型列表
     document.getElementById('tab-btn-models').addEventListener('shown.bs.tab', () => {
       loadModelsCatalog();
     });
+
+    checkLoginMethodAvailability();
 
     if (token) {
       showDashboard();
@@ -988,6 +1209,116 @@ export default {
 async function handleAdminApi(request, env, url) {
   const path = url.pathname.replace("/admin/api", "");
 
+  // 获取公开配置 (判断是否开启邮箱验证码登录入口，默认关闭)
+  if (path === "/public-config" && request.method === "GET") {
+    const raw = await env.AI_GATEWAY_KV.get("CONFIG_EMAIL_AUTH");
+    const cfg = raw ? JSON.parse(raw) : { enabled: false, email: "cf@xvuvx.com" };
+    return jsonResp({
+      emailAuthEnabled: !!cfg.enabled,
+      adminEmail: cfg.email || "cf@xvuvx.com"
+    });
+  }
+
+  // 发送邮箱动态验证码
+  if (path === "/send-email-code" && request.method === "POST") {
+    const raw = await env.AI_GATEWAY_KV.get("CONFIG_EMAIL_AUTH");
+    const cfg = raw ? JSON.parse(raw) : { enabled: false, email: "cf@xvuvx.com" };
+    if (!cfg.enabled) {
+      return jsonResp({ error: "邮箱验证码登录功能尚未开启，请在系统设置中启用" }, 403);
+    }
+
+    const { email } = await request.json();
+    const targetEmail = (email || "").trim().toLowerCase();
+    const adminEmail = (cfg.email || "cf@xvuvx.com").trim().toLowerCase();
+
+    if (targetEmail !== adminEmail) {
+      return jsonResp({ error: "输入的邮箱非系统设定的安全管理员邮箱" }, 403);
+    }
+
+    // 生成 6 位随机验证码
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    // 存入 KV，有效期 10 分钟 (600秒)
+    await env.AI_GATEWAY_KV.put("EMAIL_CODE:" + targetEmail, code, { expirationTtl: 600 });
+
+    // 尝试通过邮件发送或记录
+    let sendSuccess = false;
+    let sendErrMsg = "";
+
+    // 1. 如果配置了 Resend API Key，调用 Resend 发送
+    if (cfg.resendKey) {
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${cfg.resendKey}`
+          },
+          body: JSON.stringify({
+            from: "Edge AI Gateway <onboarding@resend.dev>",
+            to: [targetEmail],
+            subject: "【Edge AI Gateway】控制台登录验证码",
+            html: `<div style="font-family:sans-serif;padding:20px;color:#1e293b;">
+              <h2>Edge AI Gateway 管理员身份核验</h2>
+              <p>您好，您正在尝试通过邮箱验证登录 Edge AI Gateway 控制台。</p>
+              <p>您的动态登录验证码为：</p>
+              <div style="font-size:28px;font-weight:bold;letter-spacing:4px;color:#4f46e5;padding:12px;background:#f1f5f9;border-radius:8px;display:inline-block;">${code}</div>
+              <p style="color:#64748b;font-size:13px;margin-top:16px;">验证码 10 分钟内有效。如非本人操作，请忽略此邮件并检查凭证安全。</p>
+            </div>`
+          })
+        });
+        const data = await res.json();
+        if (data.id) {
+          sendSuccess = true;
+        } else {
+          sendErrMsg = data.message || "邮件投递接口返回异常";
+        }
+      } catch (err) {
+        sendErrMsg = err.message;
+      }
+    }
+
+    // 2. 备用通道 / 开发模式：如果未配第三方发信Key，验证码留存在系统记录中
+    if (!sendSuccess) {
+      // 记录到 KV 最近日志，便于控制台检索核对
+      await env.AI_GATEWAY_KV.put("LAST_EMAIL_CODE_NOTICE", JSON.stringify({
+        email: targetEmail,
+        code,
+        time: new Date().toISOString(),
+        note: sendErrMsg ? "Resend投递异常: " + sendErrMsg : "已生成边缘安全验证码"
+      }), { expirationTtl: 600 });
+    }
+
+    return jsonResp({
+      success: true,
+      message: sendSuccess 
+        ? "动态验证码已成功发往 " + targetEmail + "，请查收！" 
+        : "验证码已生成并就绪 (10分钟有效)！如未收到邮件可在 Cloudflare KV 中查收最新凭证。"
+    });
+  }
+
+  // 邮箱动态验证码登录核验
+  if (path === "/login-by-email" && request.method === "POST") {
+    const raw = await env.AI_GATEWAY_KV.get("CONFIG_EMAIL_AUTH");
+    const cfg = raw ? JSON.parse(raw) : { enabled: false, email: "cf@xvuvx.com" };
+    if (!cfg.enabled) {
+      return jsonResp({ error: "邮箱验证码登录功能尚未开启" }, 403);
+    }
+
+    const { email, code } = await request.json();
+    const targetEmail = (email || "").trim().toLowerCase();
+    const inputCode = (code || "").trim();
+
+    const storedCode = await env.AI_GATEWAY_KV.get("EMAIL_CODE:" + targetEmail);
+    if (storedCode && storedCode === inputCode) {
+      // 验证成功后单次立即作废
+      await env.AI_GATEWAY_KV.delete("EMAIL_CODE:" + targetEmail);
+      const token = "admin_" + crypto.randomUUID().replace(/-/g, "");
+      await env.AI_GATEWAY_KV.put("SESSION:" + token, "1", { expirationTtl: 86400 });
+      return jsonResp({ token });
+    }
+    return jsonResp({ error: "验证码错误或已过期，请重新获取" }, 401);
+  }
+
   if (path === "/login" && request.method === "POST") {
     const { password } = await request.json();
     const storedPwd = (await env.AI_GATEWAY_KV.get("ADMIN_PWD")) || env.ADMIN_PASSWORD || "admin";
@@ -1035,6 +1366,18 @@ async function handleAdminApi(request, env, url) {
   if (path === "/settings/mapping" && request.method === "POST") {
     const data = await request.json();
     await env.AI_GATEWAY_KV.put("MODEL_MAPPING", JSON.stringify(data));
+    return jsonResp({ success: true });
+  }
+
+  // 邮箱登录配置读取与修改
+  if (path === "/settings/email-auth" && request.method === "GET") {
+    const raw = await env.AI_GATEWAY_KV.get("CONFIG_EMAIL_AUTH");
+    return jsonResp(raw ? JSON.parse(raw) : { enabled: false, email: "cf@xvuvx.com", resendKey: "" });
+  }
+
+  if (path === "/settings/email-auth" && request.method === "POST") {
+    const data = await request.json();
+    await env.AI_GATEWAY_KV.put("CONFIG_EMAIL_AUTH", JSON.stringify(data));
     return jsonResp({ success: true });
   }
 
