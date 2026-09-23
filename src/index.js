@@ -412,6 +412,27 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
               </div>
             </div>
 
+            <!-- 访问门禁开关 (控制是否显示登录页，默认关闭：未开启时免登录直达控制台) -->
+            <div class="col-md-6">
+              <div class="card p-4 h-100 border-primary border-opacity-25" style="background: rgba(99, 102, 241, 0.06);">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-shield-lock-fill me-2"></i>网页访问门禁 (登录页总开关)</h6>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="login-gate-enabled" role="switch" style="cursor: pointer; transform: scale(1.25);">
+                  </div>
+                </div>
+                <p class="small mb-3" style="color: #cbd5e1;">
+                  <strong>当前设计原则：默认关闭</strong>。<br>
+                  • <strong>关闭（默认）</strong>：访客与开发者访问网页时<strong>无需登录</strong>，直接进入控制台管理与调试；<br>
+                  • <strong>开启</strong>：进入网页必须通过管理员身份核验（密码或邮箱验证码）方可访问。
+                </p>
+                <div class="alert alert-dark bg-dark bg-opacity-50 border-secondary border-opacity-25 py-2 px-3 small text-muted mb-3">
+                  <i class="bi bi-info-circle me-1 text-info"></i> 关闭状态下，高危操作（如删除 Key、复制完整 API Key）仍受二级管理员密码保护。
+                </div>
+                <button class="btn btn-primary" onclick="saveLoginGateConfig()"><i class="bi bi-check2-circle me-1"></i>保存访问门禁设置</button>
+              </div>
+            </div>
+
             <!-- 邮箱验证码登录开关 (配置中心) -->
             <div class="col-md-6">
               <div class="card p-4 h-100">
@@ -421,7 +442,7 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
                     <input class="form-check-input" type="checkbox" id="email-auth-enabled" role="switch" onchange="toggleEmailAuthUI()" style="cursor: pointer; transform: scale(1.2);">
                   </div>
                 </div>
-                <p class="small mb-3" style="color: #94a3b8;">开启后，登录页将支持使用邮箱动态验证码进行验证登录；默认关闭，保持原有的传统密码管理登录。</p>
+                <p class="small mb-3" style="color: #94a3b8;">在开启了上述“网页访问门禁”的前提下，可进一步启用邮箱动态验证码登录（可与传统密码登录并存）。</p>
                 <div class="mb-3">
                   <label class="form-label small" style="color: #cbd5e1;">接收验证码的安全管理员邮箱</label>
                   <input type="email" id="email-auth-addr" class="form-control" value="cf@xvuvx.com" placeholder="例如 cf@xvuvx.com">
@@ -1068,6 +1089,12 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       if (mapping.claudeModel) document.getElementById('cf-claude-model').value = mapping.claudeModel;
       if (mapping.openaiModel) document.getElementById('cf-openai-model').value = mapping.openaiModel;
 
+      // 读取网页访问门禁配置 (登录页总开关)
+      try {
+        const gateCfg = await req('/settings/login-gate');
+        document.getElementById('login-gate-enabled').checked = !!gateCfg.enabled;
+      } catch (e) {}
+
       // 读取邮箱验证登录配置
       try {
         const emailCfg = await req('/settings/email-auth');
@@ -1075,6 +1102,16 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
         if (emailCfg.email) document.getElementById('email-auth-addr').value = emailCfg.email;
         if (emailCfg.resendKey) document.getElementById('email-resend-key').value = emailCfg.resendKey;
       } catch (e) {}
+    }
+
+    async function saveLoginGateConfig() {
+      const enabled = document.getElementById('login-gate-enabled').checked;
+      await req('/settings/login-gate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      alert('网页访问门禁设置已生效！' + (enabled ? '已启用登录页，访问网页需进行身份核验。' : '已关闭登录页，全站免登录即可访问控制台。'));
     }
 
     function toggleEmailAuthUI() {
@@ -1116,11 +1153,25 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       logout();
     }
 
-    // 检查服务端是否开启了邮箱验证码登录开关
-    async function checkLoginMethodAvailability() {
+    // 检查访问门禁以及登录方式可用性
+    async function checkAccessGate() {
       try {
         const res = await fetch('/admin/api/public-config');
         const cfg = await res.json();
+        
+        // 若访问门禁未开启 (默认关闭)，直接免登录进入控制台
+        if (!cfg.loginGateEnabled) {
+          showDashboard();
+          return;
+        }
+
+        // 若访问门禁开启，已有有效 token 则进入控制台
+        if (token) {
+          showDashboard();
+          return;
+        }
+
+        // 门禁开启且无 token，展示登录表单
         const nav = document.getElementById('login-method-nav');
         if (cfg && cfg.emailAuthEnabled) {
           nav.classList.remove('d-none');
@@ -1132,9 +1183,19 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
           switchLoginMethod('pwd');
         }
       } catch (e) {
-        document.getElementById('login-method-nav').classList.add('d-none');
-        switchLoginMethod('pwd');
+        // 网络异常或兜底：如果有 token 尝试展示，没有则展示密码登录
+        if (token) {
+          showDashboard();
+        } else {
+          document.getElementById('login-method-nav').classList.add('d-none');
+          switchLoginMethod('pwd');
+        }
       }
+    }
+
+    // 兼容原有登出后的登录检查
+    function checkLoginMethodAvailability() {
+      checkAccessGate();
     }
 
     // 监听模型库 Tab 切换，自动拉取或刷新可用模型列表
@@ -1142,11 +1203,8 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       loadModelsCatalog();
     });
 
-    checkLoginMethodAvailability();
-
-    if (token) {
-      showDashboard();
-    }
+    // 页面初始化入口
+    checkAccessGate();
   </script>
 </body>
 </html>`;
@@ -1209,13 +1267,18 @@ export default {
 async function handleAdminApi(request, env, url) {
   const path = url.pathname.replace("/admin/api", "");
 
-  // 获取公开配置 (判断是否开启邮箱验证码登录入口，默认关闭)
+  // 获取公开配置 (判断是否开启访问门禁以及是否开启邮箱验证码登录，访问门禁默认关闭：enabled=false)
   if (path === "/public-config" && request.method === "GET") {
-    const raw = await env.AI_GATEWAY_KV.get("CONFIG_EMAIL_AUTH");
-    const cfg = raw ? JSON.parse(raw) : { enabled: false, email: "cf@xvuvx.com" };
+    const rawGate = await env.AI_GATEWAY_KV.get("CONFIG_LOGIN_GATE");
+    const gateCfg = rawGate ? JSON.parse(rawGate) : { enabled: false };
+
+    const rawEmail = await env.AI_GATEWAY_KV.get("CONFIG_EMAIL_AUTH");
+    const emailCfg = rawEmail ? JSON.parse(rawEmail) : { enabled: false, email: "cf@xvuvx.com" };
+
     return jsonResp({
-      emailAuthEnabled: !!cfg.enabled,
-      adminEmail: cfg.email || "cf@xvuvx.com"
+      loginGateEnabled: !!gateCfg.enabled,
+      emailAuthEnabled: !!emailCfg.enabled,
+      adminEmail: emailCfg.email || "cf@xvuvx.com"
     });
   }
 
@@ -1337,15 +1400,34 @@ async function handleAdminApi(request, env, url) {
     if (password === storedPwd) {
       return jsonResp({ success: true });
     }
-    return jsonResp({ error: "密码错误，无法复制 API Key" }, 403);
+    return jsonResp({ error: "管理员密码错误" }, 403);
   }
 
-  // 校验登录状态
+  // 访问门禁开关配置读写 (未受 SESSION 阻拦前或在校验前处理，支持获取与设置)
+  if (path === "/settings/login-gate" && request.method === "GET") {
+    const raw = await env.AI_GATEWAY_KV.get("CONFIG_LOGIN_GATE");
+    return jsonResp(raw ? JSON.parse(raw) : { enabled: false });
+  }
+
+  // 校验登录状态 (若访问门禁关闭，则允许免登录访问后台常规功能接口；若访问门禁开启，则必须验证 Token)
+  const rawGate = await env.AI_GATEWAY_KV.get("CONFIG_LOGIN_GATE");
+  const gateCfg = rawGate ? JSON.parse(rawGate) : { enabled: false };
+  const loginGateEnabled = !!gateCfg.enabled;
+
   const auth = request.headers.get("Authorization") || "";
   const token = auth.replace("Bearer ", "").trim();
   const isValid = token && (await env.AI_GATEWAY_KV.get("SESSION:" + token));
-  if (!isValid) {
+
+  // 如果门禁开启且 Token 无效，拦截为 401
+  if (loginGateEnabled && !isValid) {
     return jsonResp({ error: "未授权或登录已过期" }, 401);
+  }
+
+  // 保存访问门禁设置 (若门禁已开启则需有效登录才能改动)
+  if (path === "/settings/login-gate" && request.method === "POST") {
+    const data = await request.json();
+    await env.AI_GATEWAY_KV.put("CONFIG_LOGIN_GATE", JSON.stringify({ enabled: !!data.enabled }));
+    return jsonResp({ success: true, enabled: !!data.enabled });
   }
 
   if (path === "/password" && request.method === "POST") {
