@@ -329,6 +329,30 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
     </div>
   </div>
 
+  <!-- 二级删除确认 Modal (风格与安全复制弹窗一致) -->
+  <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-danger-subtle bg-danger-subtle">
+          <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> 高危确认：删除项</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3" id="delete-modal-desc">确认要删除此项吗？</p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">请输入管理员密码以核准删除</label>
+            <input type="password" id="delete-confirm-pwd" class="form-control" placeholder="管理员密码" onkeydown="if(event.key==='Enter') executeDeleteConfirm()">
+            <div id="delete-pwd-err" class="text-danger small mt-2 d-none"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-danger" onclick="executeDeleteConfirm()"><i class="bi bi-trash3-fill"></i> 验证并永久删除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let token = localStorage.getItem('admin_token') || '';
@@ -431,6 +455,69 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       }
     }
 
+    let pendingDeleteAction = null;
+
+    function promptDeleteKey(key, name) {
+      pendingDeleteAction = async () => {
+        await req('/keys?key=' + encodeURIComponent(key), { method: 'DELETE' });
+        loadKeys();
+      };
+      document.getElementById('delete-modal-desc').innerHTML = 
+        '您正在尝试删除 API Key：<strong>' + (name || key.slice(0, 10)) + '</strong>。<br><span class="text-danger">删除后使用此 Key 的客户端（如 Claude Code / zCode）将立刻无法接入！</span>';
+      document.getElementById('delete-confirm-pwd').value = '';
+      const err = document.getElementById('delete-pwd-err');
+      err.innerText = '';
+      err.classList.add('d-none');
+      const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+      modal.show();
+      setTimeout(() => document.getElementById('delete-confirm-pwd').focus(), 400);
+    }
+
+    function promptDeleteChannel(id, name) {
+      pendingDeleteAction = async () => {
+        await req('/channels?id=' + encodeURIComponent(id), { method: 'DELETE' });
+        loadChannels();
+      };
+      document.getElementById('delete-modal-desc').innerHTML = 
+        '您正在尝试删除上游渠道配置：<strong>' + (name || id) + '</strong>。<br><span class="text-danger">删除后将无法通过此渠道路由请求。</span>';
+      document.getElementById('delete-confirm-pwd').value = '';
+      const err = document.getElementById('delete-pwd-err');
+      err.innerText = '';
+      err.classList.add('d-none');
+      const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+      modal.show();
+      setTimeout(() => document.getElementById('delete-confirm-pwd').focus(), 400);
+    }
+
+    async function executeDeleteConfirm() {
+      const pwd = document.getElementById('delete-confirm-pwd').value;
+      const err = document.getElementById('delete-pwd-err');
+      if (!pwd) {
+        err.innerText = '请输入管理员密码以核准操作';
+        err.classList.remove('d-none');
+        return;
+      }
+
+      try {
+        const res = await req('/verify-pwd', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd })
+        });
+
+        if (res.success) {
+          bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+          if (pendingDeleteAction) {
+            await pendingDeleteAction();
+            pendingDeleteAction = null;
+          }
+        }
+      } catch (e) {
+        err.innerText = '密码错误，无权执行删除！';
+        err.classList.remove('d-none');
+      }
+    }
+
     async function loadKeys() {
       const list = await req('/keys');
       const tbody = document.getElementById('keys-tbody');
@@ -452,7 +539,9 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
           <td>\${k.used || 0} / \${k.quota === 0 ? '无限制' : k.quota}</td>
           <td><span class="badge \${k.enabled ? 'bg-success' : 'bg-secondary'}">\${k.enabled ? '有效' : '禁用'}</span></td>
           <td>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteKey('\${k.key}')">删除</button>
+            <button class="btn btn-outline-danger btn-sm py-0 px-2 d-flex align-items-center gap-1" title="删除 Key (需验证密码)" onclick="promptDeleteKey('\${k.key}', '\${k.name}')">
+              <i class="bi bi-trash"></i> 删除
+            </button>
           </td>
         </tr>
       \`).join('');
@@ -473,12 +562,6 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
         body: JSON.stringify({ name, quota })
       });
       bootstrap.Modal.getInstance(document.getElementById('keyModal')).hide();
-      loadKeys();
-    }
-
-    async function deleteKey(key) {
-      if (!confirm('确定删除此 Key 吗？客户端将立刻无法使用。')) return;
-      await req('/keys?key=' + encodeURIComponent(key), { method: 'DELETE' });
       loadKeys();
     }
 
@@ -503,7 +586,9 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
             <td>外部代理</td>
             <td>\${c.baseUrl || '(官方端点)'}</td>
             <td>
-              <button class="btn btn-sm btn-outline-danger" onclick="deleteChannel('\${c.id}')">删除</button>
+              <button class="btn btn-outline-danger btn-sm py-0 px-2 d-flex align-items-center gap-1" title="删除渠道 (需验证密码)" onclick="promptDeleteChannel('\${c.id}', '\${c.name}')">
+                <i class="bi bi-trash"></i> 删除
+              </button>
             </td>
           </tr>
         \`).join('');
