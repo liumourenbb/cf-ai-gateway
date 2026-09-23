@@ -302,6 +302,28 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
         </div>
       </div>
     </div>
+  <!-- 二级确认密码 Modal -->
+  <div class="modal fade" id="copyConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-shield-lock-fill text-warning"></i> 安全确认：复制 API Key</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">为保障密钥安全，复制完整的 API Key 前需输入管理员密码进行身份核验。</p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">请输入管理员密码</label>
+            <input type="password" id="confirm-pwd" class="form-control" placeholder="管理员密码" onkeydown="if(event.key==='Enter') executeCopyKey()">
+            <div id="copy-pwd-err" class="text-danger small mt-2 d-none"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" onclick="executeCopyKey()"><i class="bi bi-clipboard-check"></i> 验证并复制</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -363,6 +385,49 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       loadSettings();
     }
 
+    let pendingKeyToCopy = '';
+
+    function promptCopyKey(key) {
+      pendingKeyToCopy = key;
+      document.getElementById('confirm-pwd').value = '';
+      const err = document.getElementById('copy-pwd-err');
+      err.innerText = '';
+      err.classList.add('d-none');
+      const modal = new bootstrap.Modal(document.getElementById('copyConfirmModal'));
+      modal.show();
+      setTimeout(() => document.getElementById('confirm-pwd').focus(), 400);
+    }
+
+    async function executeCopyKey() {
+      const pwd = document.getElementById('confirm-pwd').value;
+      const err = document.getElementById('copy-pwd-err');
+      if (!pwd) {
+        err.innerText = '请输入管理员密码';
+        err.classList.remove('d-none');
+        return;
+      }
+
+      try {
+        const res = await req('/verify-pwd', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd })
+        });
+
+        if (res.success) {
+          bootstrap.Modal.getInstance(document.getElementById('copyConfirmModal')).hide();
+          navigator.clipboard.writeText(pendingKeyToCopy).then(() => {
+            alert('验证成功！API Key 已复制到剪贴板。');
+          }).catch(() => {
+            prompt('验证成功！请手动复制 API Key:', pendingKeyToCopy);
+          });
+        }
+      } catch (e) {
+        err.innerText = '密码错误，验证失败！';
+        err.classList.remove('d-none');
+      }
+    }
+
     async function loadKeys() {
       const list = await req('/keys');
       const tbody = document.getElementById('keys-tbody');
@@ -373,7 +438,14 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       tbody.innerHTML = list.map(k => \`
         <tr>
           <td>\${k.name}</td>
-          <td><code>\${k.key}</code></td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <code>\${k.key.slice(0, 10)}****************\${k.key.slice(-4)}</code>
+              <button class="btn btn-outline-primary btn-sm py-0 px-2 d-flex align-items-center gap-1" title="复制完整Key (需验证密码)" onclick="promptCopyKey('\${k.key}')">
+                <i class="bi bi-clipboard"></i> 复制
+              </button>
+            </div>
+          </td>
           <td>\${k.used || 0} / \${k.quota === 0 ? '无限制' : k.quota}</td>
           <td><span class="badge \${k.enabled ? 'bg-success' : 'bg-secondary'}">\${k.enabled ? '有效' : '禁用'}</span></td>
           <td>
@@ -695,6 +767,16 @@ async function handleAdminApi(request, env, url) {
       return jsonResp({ token });
     }
     return jsonResp({ error: "管理员密码错误" }, 401);
+  }
+
+  // 二级确认：核验管理员密码
+  if (path === "/verify-pwd" && request.method === "POST") {
+    const { password } = await request.json();
+    const storedPwd = (await env.AI_GATEWAY_KV.get("ADMIN_PWD")) || env.ADMIN_PASSWORD || "admin";
+    if (password === storedPwd) {
+      return jsonResp({ success: true });
+    }
+    return jsonResp({ error: "密码错误，无法复制 API Key" }, 403);
   }
 
   // 校验登录状态
