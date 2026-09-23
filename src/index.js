@@ -65,20 +65,20 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
       </div>
 
       <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
-        <li class="nav-item">
-          <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-keys" type="button"><i class="bi bi-key-fill"></i> 分发令牌 (API Keys)</button>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-btn-keys" data-bs-toggle="pill" data-bs-target="#tab-keys" type="button" role="tab"><i class="bi bi-key-fill"></i> 分发令牌 (API Keys)</button>
         </li>
-        <li class="nav-item">
-          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-channels" type="button"><i class="bi bi-hdd-network-fill"></i> 渠道与模型映射</button>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-btn-channels" data-bs-toggle="pill" data-bs-target="#tab-channels" type="button" role="tab"><i class="bi bi-hdd-network-fill"></i> 渠道与模型映射</button>
         </li>
-        <li class="nav-item">
-          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-models" type="button" onclick="loadModelsCatalog()"><i class="bi bi-robot"></i> 可用模型库</button>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-btn-models" data-bs-toggle="pill" data-bs-target="#tab-models" type="button" role="tab"><i class="bi bi-robot"></i> 可用模型库</button>
         </li>
-        <li class="nav-item">
-          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-guide" type="button"><i class="bi bi-terminal-fill"></i> CLI 接入指引</button>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-btn-guide" data-bs-toggle="pill" data-bs-target="#tab-guide" type="button" role="tab"><i class="bi bi-terminal-fill"></i> CLI 接入指引</button>
         </li>
-        <li class="nav-item">
-          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-settings" type="button"><i class="bi bi-gear-fill"></i> 系统设置</button>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-btn-settings" data-bs-toggle="pill" data-bs-target="#tab-settings" type="button" role="tab"><i class="bi bi-gear-fill"></i> 系统设置</button>
         </li>
       </ul>
 
@@ -164,6 +164,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
               <h6 class="fw-bold small text-secondary mb-2"><i class="bi bi-grid-3x3-gap"></i> Cloudflare 官方热门边缘模型快速点击切换：</h6>
               <div class="d-flex flex-wrap gap-2" id="quick-models-container"></div>
             </div>
+          </div>
         </div>
 
         <!-- 可用模型库详情面板 -->
@@ -302,6 +303,8 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
         </div>
       </div>
     </div>
+  </div>
+
   <!-- 二级确认密码 Modal -->
   <div class="modal fade" id="copyConfirmModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -692,6 +695,11 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       alert('密码更新成功，请重新登录！');
       logout();
     }
+
+    // 监听模型库 Tab 切换，自动拉取或刷新可用模型列表
+    document.getElementById('tab-btn-models').addEventListener('shown.bs.tab', () => {
+      loadModelsCatalog();
+    });
 
     if (token) {
       showDashboard();
