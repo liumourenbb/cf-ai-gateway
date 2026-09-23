@@ -277,7 +277,7 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
                   <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">预设选择</button>
                   <ul class="dropdown-menu dropdown-menu-end" id="claude-presets-dropdown"></ul>
                 </div>
-                <div class="form-text">Claude Code 发起的请求若未特别指定模型，将默认由此模型处理。</div>
+                <div class="form-text text-secondary" style="color: #94a3b8 !important;">Claude Code 发起的请求若未特别指定模型，将默认由此模型处理。</div>
               </div>
               <div class="col-md-6">
                 <label class="form-label small fw-semibold">OpenAI / ZCode 映射的 CF 边缘模型：</label>
@@ -286,19 +286,19 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
                   <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">预设选择</button>
                   <ul class="dropdown-menu dropdown-menu-end" id="openai-presets-dropdown"></ul>
                 </div>
-                <div class="form-text">OpenAI CLI / ZCode 请求若使用通用名称时，映射到的边缘模型。</div>
+                <div class="form-text text-secondary" style="color: #94a3b8 !important;">OpenAI CLI / ZCode 请求若使用通用名称时，映射到的边缘模型。</div>
               </div>
             </div>
             <datalist id="model-presets"></datalist>
 
-            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-              <span class="text-muted small">支持在客户端直接通过 <code>model</code> 参数动态调用列表内的任一模型。</span>
-              <button class="btn btn-primary btn-sm px-4" onclick="saveModelMapping()"><i class="bi bi-check-lg"></i> 保存并立即生效</button>
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
+              <span class="small" style="color: #94a3b8;">支持在客户端直接通过 <code>model</code> 参数动态调用列表内的任一模型。</span>
+              <button class="btn btn-primary btn-sm px-4 shadow-sm" onclick="saveModelMapping()"><i class="bi bi-check-lg"></i> 保存并立即生效</button>
             </div>
 
             <!-- 可用模型一览表 -->
-            <div class="mt-4">
-              <h6 class="fw-bold small text-secondary mb-2"><i class="bi bi-grid-3x3-gap"></i> Cloudflare 官方热门边缘模型快速点击切换：</h6>
+            <div class="mt-4 pt-3 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
+              <h6 class="fw-bold small mb-3 text-light opacity-75"><i class="bi bi-grid-3x3-gap me-1 text-primary"></i> Cloudflare 官方热门边缘模型快速点击切换：</h6>
               <div class="d-flex flex-wrap gap-2" id="quick-models-container"></div>
             </div>
           </div>
@@ -791,9 +791,9 @@ export OPENAI_API_KEY="sk-cf-xxxxxxxx"
       \`).join('');
 
       quickContainer.innerHTML = CF_CATALOG.map(m => \`
-        <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" onclick="applyBothModels('\${m.id}')">
-          <span>\${m.name}</span>
-          <span class="badge bg-light text-dark border">\${m.tag}</span>
+        <button type="button" class="btn btn-sm d-flex align-items-center gap-2 px-3 py-1 text-light" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;" onclick="applyBothModels('\${m.id}')">
+          <span class="small">\${m.name}</span>
+          <span class="badge" style="background: rgba(99,102,241,0.3); color: #a5b4fc; border: 1px solid rgba(165,180,252,0.3);">\${m.tag}</span>
         </button>
       \`).join('');
     }
